@@ -1,0 +1,666 @@
+﻿{
+    "openapi":  "3.0.1",
+    "info":  {
+                 "title":  "Wallet Service API",
+                 "description":  "Mission-critical wallet service for managing user funds.\nSupports deposit, withdrawal, transfer, and full transaction history.\nAll monetary operations are fully traceable for audit purposes.\n",
+                 "contact":  {
+                                 "name":  "Wallet Team"
+                             },
+                 "version":  "1.0.0"
+             },
+    "servers":  [
+                    {
+                        "url":  "http://localhost:8080",
+                        "description":  "Generated server url"
+                    }
+                ],
+    "tags":  [
+                 {
+                     "name":  "Wallets",
+                     "description":  "Wallet management and operations"
+                 }
+             ],
+    "paths":  {
+                  "/api/v1/wallets":  {
+                                          "post":  {
+                                                       "tags":  [
+                                                                    "Wallets"
+                                                                ],
+                                                       "summary":  "Create a wallet for a user",
+                                                       "operationId":  "createWallet",
+                                                       "requestBody":  {
+                                                                           "content":  {
+                                                                                           "application/json":  {
+                                                                                                                    "schema":  {
+                                                                                                                                   "$ref":  "#/components/schemas/CreateWalletRequest"
+                                                                                                                               }
+                                                                                                                }
+                                                                                       },
+                                                                           "required":  true
+                                                                       },
+                                                       "responses":  {
+                                                                         "201":  {
+                                                                                     "description":  "Created",
+                                                                                     "content":  {
+                                                                                                     "*/*":  {
+                                                                                                                 "schema":  {
+                                                                                                                                "$ref":  "#/components/schemas/WalletResponse"
+                                                                                                                            }
+                                                                                                             }
+                                                                                                 }
+                                                                                 }
+                                                                     }
+                                                   }
+                                      },
+                  "/api/v1/wallets/{walletId}/withdraw":  {
+                                                              "post":  {
+                                                                           "tags":  [
+                                                                                        "Wallets"
+                                                                                    ],
+                                                                           "summary":  "Withdraw funds from a wallet",
+                                                                           "operationId":  "withdraw",
+                                                                           "parameters":  [
+                                                                                              {
+                                                                                                  "name":  "walletId",
+                                                                                                  "in":  "path",
+                                                                                                  "required":  true,
+                                                                                                  "schema":  {
+                                                                                                                 "type":  "string",
+                                                                                                                 "format":  "uuid"
+                                                                                                             }
+                                                                                              }
+                                                                                          ],
+                                                                           "requestBody":  {
+                                                                                               "content":  {
+                                                                                                               "application/json":  {
+                                                                                                                                        "schema":  {
+                                                                                                                                                       "$ref":  "#/components/schemas/WithdrawRequest"
+                                                                                                                                                   }
+                                                                                                                                    }
+                                                                                                           },
+                                                                                               "required":  true
+                                                                                           },
+                                                                           "responses":  {
+                                                                                             "200":  {
+                                                                                                         "description":  "OK",
+                                                                                                         "content":  {
+                                                                                                                         "*/*":  {
+                                                                                                                                     "schema":  {
+                                                                                                                                                    "$ref":  "#/components/schemas/TransactionResponse"
+                                                                                                                                                }
+                                                                                                                                 }
+                                                                                                                     }
+                                                                                                     }
+                                                                                         }
+                                                                       }
+                                                          },
+                  "/api/v1/wallets/{walletId}/transfer":  {
+                                                              "post":  {
+                                                                           "tags":  [
+                                                                                        "Wallets"
+                                                                                    ],
+                                                                           "summary":  "Transfer funds to another wallet",
+                                                                           "operationId":  "transfer",
+                                                                           "parameters":  [
+                                                                                              {
+                                                                                                  "name":  "walletId",
+                                                                                                  "in":  "path",
+                                                                                                  "required":  true,
+                                                                                                  "schema":  {
+                                                                                                                 "type":  "string",
+                                                                                                                 "format":  "uuid"
+                                                                                                             }
+                                                                                              }
+                                                                                          ],
+                                                                           "requestBody":  {
+                                                                                               "content":  {
+                                                                                                               "application/json":  {
+                                                                                                                                        "schema":  {
+                                                                                                                                                       "$ref":  "#/components/schemas/TransferRequest"
+                                                                                                                                                   }
+                                                                                                                                    }
+                                                                                                           },
+                                                                                               "required":  true
+                                                                                           },
+                                                                           "responses":  {
+                                                                                             "200":  {
+                                                                                                         "description":  "OK",
+                                                                                                         "content":  {
+                                                                                                                         "*/*":  {
+                                                                                                                                     "schema":  {
+                                                                                                                                                    "$ref":  "#/components/schemas/TransactionResponse"
+                                                                                                                                                }
+                                                                                                                                 }
+                                                                                                                     }
+                                                                                                     }
+                                                                                         }
+                                                                       }
+                                                          },
+                  "/api/v1/wallets/{walletId}/deposit":  {
+                                                             "post":  {
+                                                                          "tags":  [
+                                                                                       "Wallets"
+                                                                                   ],
+                                                                          "summary":  "Deposit funds into a wallet",
+                                                                          "operationId":  "deposit",
+                                                                          "parameters":  [
+                                                                                             {
+                                                                                                 "name":  "walletId",
+                                                                                                 "in":  "path",
+                                                                                                 "required":  true,
+                                                                                                 "schema":  {
+                                                                                                                "type":  "string",
+                                                                                                                "format":  "uuid"
+                                                                                                            }
+                                                                                             }
+                                                                                         ],
+                                                                          "requestBody":  {
+                                                                                              "content":  {
+                                                                                                              "application/json":  {
+                                                                                                                                       "schema":  {
+                                                                                                                                                      "$ref":  "#/components/schemas/DepositRequest"
+                                                                                                                                                  }
+                                                                                                                                   }
+                                                                                                          },
+                                                                                              "required":  true
+                                                                                          },
+                                                                          "responses":  {
+                                                                                            "200":  {
+                                                                                                        "description":  "OK",
+                                                                                                        "content":  {
+                                                                                                                        "*/*":  {
+                                                                                                                                    "schema":  {
+                                                                                                                                                   "$ref":  "#/components/schemas/TransactionResponse"
+                                                                                                                                               }
+                                                                                                                                }
+                                                                                                                    }
+                                                                                                    }
+                                                                                        }
+                                                                      }
+                                                         },
+                  "/api/v1/wallets/{walletId}":  {
+                                                     "get":  {
+                                                                 "tags":  [
+                                                                              "Wallets"
+                                                                          ],
+                                                                 "summary":  "Get wallet by ID",
+                                                                 "operationId":  "getWallet",
+                                                                 "parameters":  [
+                                                                                    {
+                                                                                        "name":  "walletId",
+                                                                                        "in":  "path",
+                                                                                        "required":  true,
+                                                                                        "schema":  {
+                                                                                                       "type":  "string",
+                                                                                                       "format":  "uuid"
+                                                                                                   }
+                                                                                    }
+                                                                                ],
+                                                                 "responses":  {
+                                                                                   "200":  {
+                                                                                               "description":  "OK",
+                                                                                               "content":  {
+                                                                                                               "*/*":  {
+                                                                                                                           "schema":  {
+                                                                                                                                          "$ref":  "#/components/schemas/WalletResponse"
+                                                                                                                                      }
+                                                                                                                       }
+                                                                                                           }
+                                                                                           }
+                                                                               }
+                                                             }
+                                                 },
+                  "/api/v1/wallets/{walletId}/transactions":  {
+                                                                  "get":  {
+                                                                              "tags":  [
+                                                                                           "Wallets"
+                                                                                       ],
+                                                                              "summary":  "Retrieve paginated transaction history for a wallet",
+                                                                              "operationId":  "getTransactions",
+                                                                              "parameters":  [
+                                                                                                 {
+                                                                                                     "name":  "walletId",
+                                                                                                     "in":  "path",
+                                                                                                     "required":  true,
+                                                                                                     "schema":  {
+                                                                                                                    "type":  "string",
+                                                                                                                    "format":  "uuid"
+                                                                                                                }
+                                                                                                 },
+                                                                                                 {
+                                                                                                     "name":  "pageable",
+                                                                                                     "in":  "query",
+                                                                                                     "required":  true,
+                                                                                                     "schema":  {
+                                                                                                                    "$ref":  "#/components/schemas/Pageable"
+                                                                                                                }
+                                                                                                 }
+                                                                                             ],
+                                                                              "responses":  {
+                                                                                                "200":  {
+                                                                                                            "description":  "OK",
+                                                                                                            "content":  {
+                                                                                                                            "*/*":  {
+                                                                                                                                        "schema":  {
+                                                                                                                                                       "$ref":  "#/components/schemas/PageTransactionResponse"
+                                                                                                                                                   }
+                                                                                                                                    }
+                                                                                                                        }
+                                                                                                        }
+                                                                                            }
+                                                                          }
+                                                              },
+                  "/api/v1/wallets/{walletId}/balance":  {
+                                                             "get":  {
+                                                                         "tags":  [
+                                                                                      "Wallets"
+                                                                                  ],
+                                                                         "summary":  "Retrieve current balance",
+                                                                         "operationId":  "getBalance",
+                                                                         "parameters":  [
+                                                                                            {
+                                                                                                "name":  "walletId",
+                                                                                                "in":  "path",
+                                                                                                "required":  true,
+                                                                                                "schema":  {
+                                                                                                               "type":  "string",
+                                                                                                               "format":  "uuid"
+                                                                                                           }
+                                                                                            }
+                                                                                        ],
+                                                                         "responses":  {
+                                                                                           "200":  {
+                                                                                                       "description":  "OK",
+                                                                                                       "content":  {
+                                                                                                                       "*/*":  {
+                                                                                                                                   "schema":  {
+                                                                                                                                                  "$ref":  "#/components/schemas/BalanceResponse"
+                                                                                                                                              }
+                                                                                                                               }
+                                                                                                                   }
+                                                                                                   }
+                                                                                       }
+                                                                     }
+                                                         },
+                  "/api/v1/wallets/{walletId}/balance/history":  {
+                                                                     "get":  {
+                                                                                 "tags":  [
+                                                                                              "Wallets"
+                                                                                          ],
+                                                                                 "summary":  "Retrieve historical balance at a specific point in time",
+                                                                                 "operationId":  "getHistoricalBalance",
+                                                                                 "parameters":  [
+                                                                                                    {
+                                                                                                        "name":  "walletId",
+                                                                                                        "in":  "path",
+                                                                                                        "required":  true,
+                                                                                                        "schema":  {
+                                                                                                                       "type":  "string",
+                                                                                                                       "format":  "uuid"
+                                                                                                                   }
+                                                                                                    },
+                                                                                                    {
+                                                                                                        "name":  "at",
+                                                                                                        "in":  "query",
+                                                                                                        "description":  "ISO-8601 timestamp, e.g. 2024-06-01T12:00:00Z",
+                                                                                                        "required":  true,
+                                                                                                        "schema":  {
+                                                                                                                       "type":  "string",
+                                                                                                                       "format":  "date-time"
+                                                                                                                   }
+                                                                                                    }
+                                                                                                ],
+                                                                                 "responses":  {
+                                                                                                   "200":  {
+                                                                                                               "description":  "OK",
+                                                                                                               "content":  {
+                                                                                                                               "*/*":  {
+                                                                                                                                           "schema":  {
+                                                                                                                                                          "$ref":  "#/components/schemas/BalanceResponse"
+                                                                                                                                                      }
+                                                                                                                                       }
+                                                                                                                           }
+                                                                                                           }
+                                                                                               }
+                                                                             }
+                                                                 },
+                  "/api/v1/wallets/by-user/{userId}":  {
+                                                           "get":  {
+                                                                       "tags":  [
+                                                                                    "Wallets"
+                                                                                ],
+                                                                       "summary":  "Get wallet by user ID",
+                                                                       "operationId":  "getWalletByUser",
+                                                                       "parameters":  [
+                                                                                          {
+                                                                                              "name":  "userId",
+                                                                                              "in":  "path",
+                                                                                              "required":  true,
+                                                                                              "schema":  {
+                                                                                                             "type":  "string",
+                                                                                                             "format":  "uuid"
+                                                                                                         }
+                                                                                          }
+                                                                                      ],
+                                                                       "responses":  {
+                                                                                         "200":  {
+                                                                                                     "description":  "OK",
+                                                                                                     "content":  {
+                                                                                                                     "*/*":  {
+                                                                                                                                 "schema":  {
+                                                                                                                                                "$ref":  "#/components/schemas/WalletResponse"
+                                                                                                                                            }
+                                                                                                                             }
+                                                                                                                 }
+                                                                                                 }
+                                                                                     }
+                                                                   }
+                                                       }
+              },
+    "components":  {
+                       "schemas":  {
+                                       "CreateWalletRequest":  {
+                                                                   "required":  [
+                                                                                    "userId"
+                                                                                ],
+                                                                   "type":  "object",
+                                                                   "properties":  {
+                                                                                      "userId":  {
+                                                                                                     "type":  "string",
+                                                                                                     "format":  "uuid"
+                                                                                                 },
+                                                                                      "currency":  {
+                                                                                                       "pattern":  "[A-Z]{3}",
+                                                                                                       "type":  "string"
+                                                                                                   }
+                                                                                  }
+                                                               },
+                                       "WalletResponse":  {
+                                                              "type":  "object",
+                                                              "properties":  {
+                                                                                 "id":  {
+                                                                                            "type":  "string",
+                                                                                            "format":  "uuid"
+                                                                                        },
+                                                                                 "userId":  {
+                                                                                                "type":  "string",
+                                                                                                "format":  "uuid"
+                                                                                            },
+                                                                                 "balance":  {
+                                                                                                 "type":  "number"
+                                                                                             },
+                                                                                 "currency":  {
+                                                                                                  "type":  "string"
+                                                                                              },
+                                                                                 "createdAt":  {
+                                                                                                   "type":  "string",
+                                                                                                   "format":  "date-time"
+                                                                                               },
+                                                                                 "updatedAt":  {
+                                                                                                   "type":  "string",
+                                                                                                   "format":  "date-time"
+                                                                                               }
+                                                                             }
+                                                          },
+                                       "WithdrawRequest":  {
+                                                               "required":  [
+                                                                                "amount"
+                                                                            ],
+                                                               "type":  "object",
+                                                               "properties":  {
+                                                                                  "amount":  {
+                                                                                                 "minimum":  0.01,
+                                                                                                 "exclusiveMinimum":  false,
+                                                                                                 "type":  "number"
+                                                                                             },
+                                                                                  "description":  {
+                                                                                                      "maxLength":  255,
+                                                                                                      "minLength":  0,
+                                                                                                      "type":  "string"
+                                                                                                  },
+                                                                                  "idempotencyKey":  {
+                                                                                                         "type":  "string",
+                                                                                                         "format":  "uuid"
+                                                                                                     }
+                                                                              }
+                                                           },
+                                       "TransactionResponse":  {
+                                                                   "type":  "object",
+                                                                   "properties":  {
+                                                                                      "id":  {
+                                                                                                 "type":  "string",
+                                                                                                 "format":  "uuid"
+                                                                                             },
+                                                                                      "walletId":  {
+                                                                                                       "type":  "string",
+                                                                                                       "format":  "uuid"
+                                                                                                   },
+                                                                                      "type":  {
+                                                                                                   "type":  "string",
+                                                                                                   "enum":  [
+                                                                                                                "DEPOSIT",
+                                                                                                                "WITHDRAWAL",
+                                                                                                                "TRANSFER_DEBIT",
+                                                                                                                "TRANSFER_CREDIT"
+                                                                                                            ]
+                                                                                               },
+                                                                                      "amount":  {
+                                                                                                     "type":  "number"
+                                                                                                 },
+                                                                                      "balanceAfter":  {
+                                                                                                           "type":  "number"
+                                                                                                       },
+                                                                                      "currency":  {
+                                                                                                       "type":  "string"
+                                                                                                   },
+                                                                                      "correlationId":  {
+                                                                                                            "type":  "string",
+                                                                                                            "format":  "uuid"
+                                                                                                        },
+                                                                                      "counterpartWalletId":  {
+                                                                                                                  "type":  "string",
+                                                                                                                  "format":  "uuid"
+                                                                                                              },
+                                                                                      "description":  {
+                                                                                                          "type":  "string"
+                                                                                                      },
+                                                                                      "createdAt":  {
+                                                                                                        "type":  "string",
+                                                                                                        "format":  "date-time"
+                                                                                                    }
+                                                                                  }
+                                                               },
+                                       "TransferRequest":  {
+                                                               "required":  [
+                                                                                "amount",
+                                                                                "targetWalletId"
+                                                                            ],
+                                                               "type":  "object",
+                                                               "properties":  {
+                                                                                  "targetWalletId":  {
+                                                                                                         "type":  "string",
+                                                                                                         "format":  "uuid"
+                                                                                                     },
+                                                                                  "amount":  {
+                                                                                                 "minimum":  0.01,
+                                                                                                 "exclusiveMinimum":  false,
+                                                                                                 "type":  "number"
+                                                                                             },
+                                                                                  "description":  {
+                                                                                                      "maxLength":  255,
+                                                                                                      "minLength":  0,
+                                                                                                      "type":  "string"
+                                                                                                  },
+                                                                                  "idempotencyKey":  {
+                                                                                                         "type":  "string",
+                                                                                                         "format":  "uuid"
+                                                                                                     }
+                                                                              }
+                                                           },
+                                       "DepositRequest":  {
+                                                              "required":  [
+                                                                               "amount"
+                                                                           ],
+                                                              "type":  "object",
+                                                              "properties":  {
+                                                                                 "amount":  {
+                                                                                                "minimum":  0.01,
+                                                                                                "exclusiveMinimum":  false,
+                                                                                                "type":  "number"
+                                                                                            },
+                                                                                 "description":  {
+                                                                                                     "maxLength":  255,
+                                                                                                     "minLength":  0,
+                                                                                                     "type":  "string"
+                                                                                                 },
+                                                                                 "idempotencyKey":  {
+                                                                                                        "type":  "string",
+                                                                                                        "format":  "uuid"
+                                                                                                    }
+                                                                             }
+                                                          },
+                                       "Pageable":  {
+                                                        "type":  "object",
+                                                        "properties":  {
+                                                                           "page":  {
+                                                                                        "minimum":  0,
+                                                                                        "type":  "integer",
+                                                                                        "format":  "int32"
+                                                                                    },
+                                                                           "size":  {
+                                                                                        "minimum":  1,
+                                                                                        "type":  "integer",
+                                                                                        "format":  "int32"
+                                                                                    },
+                                                                           "sort":  {
+                                                                                        "type":  "array",
+                                                                                        "items":  {
+                                                                                                      "type":  "string"
+                                                                                                  }
+                                                                                    }
+                                                                       }
+                                                    },
+                                       "PageTransactionResponse":  {
+                                                                       "type":  "object",
+                                                                       "properties":  {
+                                                                                          "totalElements":  {
+                                                                                                                "type":  "integer",
+                                                                                                                "format":  "int64"
+                                                                                                            },
+                                                                                          "totalPages":  {
+                                                                                                             "type":  "integer",
+                                                                                                             "format":  "int32"
+                                                                                                         },
+                                                                                          "size":  {
+                                                                                                       "type":  "integer",
+                                                                                                       "format":  "int32"
+                                                                                                   },
+                                                                                          "content":  {
+                                                                                                          "type":  "array",
+                                                                                                          "items":  {
+                                                                                                                        "$ref":  "#/components/schemas/TransactionResponse"
+                                                                                                                    }
+                                                                                                      },
+                                                                                          "number":  {
+                                                                                                         "type":  "integer",
+                                                                                                         "format":  "int32"
+                                                                                                     },
+                                                                                          "sort":  {
+                                                                                                       "type":  "array",
+                                                                                                       "items":  {
+                                                                                                                     "$ref":  "#/components/schemas/SortObject"
+                                                                                                                 }
+                                                                                                   },
+                                                                                          "first":  {
+                                                                                                        "type":  "boolean"
+                                                                                                    },
+                                                                                          "last":  {
+                                                                                                       "type":  "boolean"
+                                                                                                   },
+                                                                                          "numberOfElements":  {
+                                                                                                                   "type":  "integer",
+                                                                                                                   "format":  "int32"
+                                                                                                               },
+                                                                                          "pageable":  {
+                                                                                                           "$ref":  "#/components/schemas/PageableObject"
+                                                                                                       },
+                                                                                          "empty":  {
+                                                                                                        "type":  "boolean"
+                                                                                                    }
+                                                                                      }
+                                                                   },
+                                       "PageableObject":  {
+                                                              "type":  "object",
+                                                              "properties":  {
+                                                                                 "offset":  {
+                                                                                                "type":  "integer",
+                                                                                                "format":  "int64"
+                                                                                            },
+                                                                                 "sort":  {
+                                                                                              "type":  "array",
+                                                                                              "items":  {
+                                                                                                            "$ref":  "#/components/schemas/SortObject"
+                                                                                                        }
+                                                                                          },
+                                                                                 "paged":  {
+                                                                                               "type":  "boolean"
+                                                                                           },
+                                                                                 "unpaged":  {
+                                                                                                 "type":  "boolean"
+                                                                                             },
+                                                                                 "pageNumber":  {
+                                                                                                    "type":  "integer",
+                                                                                                    "format":  "int32"
+                                                                                                },
+                                                                                 "pageSize":  {
+                                                                                                  "type":  "integer",
+                                                                                                  "format":  "int32"
+                                                                                              }
+                                                                             }
+                                                          },
+                                       "SortObject":  {
+                                                          "type":  "object",
+                                                          "properties":  {
+                                                                             "direction":  {
+                                                                                               "type":  "string"
+                                                                                           },
+                                                                             "nullHandling":  {
+                                                                                                  "type":  "string"
+                                                                                              },
+                                                                             "ascending":  {
+                                                                                               "type":  "boolean"
+                                                                                           },
+                                                                             "property":  {
+                                                                                              "type":  "string"
+                                                                                          },
+                                                                             "ignoreCase":  {
+                                                                                                "type":  "boolean"
+                                                                                            }
+                                                                         }
+                                                      },
+                                       "BalanceResponse":  {
+                                                               "type":  "object",
+                                                               "properties":  {
+                                                                                  "walletId":  {
+                                                                                                   "type":  "string",
+                                                                                                   "format":  "uuid"
+                                                                                               },
+                                                                                  "userId":  {
+                                                                                                 "type":  "string",
+                                                                                                 "format":  "uuid"
+                                                                                             },
+                                                                                  "balance":  {
+                                                                                                  "type":  "number"
+                                                                                              },
+                                                                                  "currency":  {
+                                                                                                   "type":  "string"
+                                                                                               },
+                                                                                  "asOf":  {
+                                                                                               "type":  "string",
+                                                                                               "format":  "date-time"
+                                                                                           }
+                                                                              }
+                                                           }
+                                   }
+                   }
+}

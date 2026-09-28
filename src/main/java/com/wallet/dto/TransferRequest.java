@@ -19,5 +19,7 @@ public record TransferRequest(
     BigDecimal amount,
 
     @Size(max = 255)
-    String description
+    String description,
+
+    UUID idempotencyKey
 ) {}

@@ -6,6 +6,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -40,6 +41,13 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ErrorResponse> handleInvalidOperation(InvalidOperationException ex, HttpServletRequest req) {
         return ResponseEntity.status(HttpStatus.BAD_REQUEST)
                 .body(ErrorResponse.of(400, "Bad Request", ex.getMessage(), req.getRequestURI()));
+    }
+
+    @ExceptionHandler(DataIntegrityViolationException.class)
+    public ResponseEntity<ErrorResponse> handleDataIntegrity(DataIntegrityViolationException ex, HttpServletRequest req) {
+        log.warn("Data integrity violation on {}: {}", req.getRequestURI(), ex.getMessage());
+        return ResponseEntity.status(HttpStatus.CONFLICT)
+                .body(ErrorResponse.of(409, "Conflict", "Request conflicts with existing data", req.getRequestURI()));
     }
 
     @ExceptionHandler(ObjectOptimisticLockingFailureException.class)

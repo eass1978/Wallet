@@ -32,4 +32,5 @@ public interface TransactionRepository extends JpaRepository<Transaction, UUID> 
     Optional<Transaction> findLatestBeforeOrAt(@Param("walletId") UUID walletId,
                                                @Param("at") Instant at);
 
+    Optional<Transaction> findByIdempotencyKey(UUID idempotencyKey);
 }

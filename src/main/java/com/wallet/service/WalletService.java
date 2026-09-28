@@ -5,6 +5,8 @@ import com.wallet.exception.DuplicateWalletException;
 import com.wallet.exception.InsufficientFundsException;
 import com.wallet.exception.InvalidOperationException;
 import com.wallet.exception.WalletNotFoundException;
+import com.wallet.mapper.TransactionMapper;
+import com.wallet.mapper.WalletMapper;
 import com.wallet.model.Transaction;
 import com.wallet.model.TransactionType;
 import com.wallet.model.Wallet;
@@ -29,10 +31,17 @@ public class WalletService {
 
     private final WalletRepository walletRepository;
     private final TransactionRepository transactionRepository;
+    private final WalletMapper walletMapper;
+    private final TransactionMapper transactionMapper;
 
-    public WalletService(WalletRepository walletRepository, TransactionRepository transactionRepository) {
+    public WalletService(WalletRepository walletRepository,
+                         TransactionRepository transactionRepository,
+                         WalletMapper walletMapper,
+                         TransactionMapper transactionMapper) {
         this.walletRepository = walletRepository;
         this.transactionRepository = transactionRepository;
+        this.walletMapper = walletMapper;
+        this.transactionMapper = transactionMapper;
     }
 
     // -----------------------------------------------------------------------
@@ -54,7 +63,7 @@ public class WalletService {
 
         wallet = walletRepository.save(wallet);
         log.info("Wallet created: id={} userId={} currency={}", wallet.getId(), wallet.getUserId(), wallet.getCurrency());
-        return toResponse(wallet);
+        return walletMapper.toResponse(wallet);
     }
 
     // -----------------------------------------------------------------------
@@ -63,26 +72,21 @@ public class WalletService {
 
     @Transactional(readOnly = true)
     public WalletResponse getWalletById(UUID walletId) {
-        return toResponse(findWalletOrThrow(walletId));
+        return walletMapper.toResponse(findWalletOrThrow(walletId));
     }
 
     @Transactional(readOnly = true)
     public WalletResponse getWalletByUserId(UUID userId) {
         Wallet wallet = walletRepository.findByUserId(userId)
                 .orElseThrow(() -> new WalletNotFoundException("No wallet found for userId: " + userId));
-        return toResponse(wallet);
+        return walletMapper.toResponse(wallet);
     }
 
     @Transactional(readOnly = true)
     public BalanceResponse getBalance(UUID walletId) {
         Wallet wallet = findWalletOrThrow(walletId);
-        return new BalanceResponse(
-                wallet.getId(),
-                wallet.getUserId(),
-                wallet.getBalance(),
-                wallet.getCurrency(),
-                Instant.now()
-        );
+        return new BalanceResponse(wallet.getId(), wallet.getUserId(),
+                wallet.getBalance(), wallet.getCurrency(), Instant.now());
     }
 
     /**
@@ -92,8 +96,6 @@ public class WalletService {
      * That record's balanceAfter is the balance at that instant.
      * If no transactions exist before that point but the wallet existed, balance is 0.
      * If the wallet was created after the requested instant, a 404 is returned.
-     *
-     * <p>Assumption: the wallet creation timestamp is available via wallet.createdAt.
      */
     @Transactional(readOnly = true)
     public BalanceResponse getHistoricalBalance(UUID walletId, Instant at) {
@@ -107,7 +109,6 @@ public class WalletService {
         BigDecimal historicalBalance = transactionRepository
                 .findLatestBeforeOrAt(walletId, at)
                 .map(Transaction::getBalanceAfter)
-                // Wallet existed but had no transactions yet => balance was 0
                 .orElse(BigDecimal.ZERO);
 
         return new BalanceResponse(wallet.getId(), wallet.getUserId(), historicalBalance, wallet.getCurrency(), at);
@@ -118,34 +119,51 @@ public class WalletService {
     // -----------------------------------------------------------------------
 
     /**
-     * Deposit funds.
-     * Uses REPEATABLE_READ to prevent phantom reads; the wallet row is locked
-     * via the pessimistic write lock in the repository method.
+     * Deposit funds. If an idempotencyKey is provided and a matching transaction
+     * already exists, returns it immediately without re-processing.
      */
     @Transactional(isolation = Isolation.REPEATABLE_READ)
     public TransactionResponse deposit(UUID walletId, DepositRequest request) {
+        if (request.idempotencyKey() != null) {
+            return transactionRepository.findByIdempotencyKey(request.idempotencyKey())
+                    .map(existing -> resolveIdempotent(existing, walletId))
+                    .orElseGet(() -> executeDeposit(walletId, request));
+        }
+        return executeDeposit(walletId, request);
+    }
+
+    private TransactionResponse executeDeposit(UUID walletId, DepositRequest request) {
         Wallet wallet = findWalletWithLockOrThrow(walletId);
 
         BigDecimal newBalance = wallet.getBalance().add(request.amount());
         wallet.setBalance(newBalance);
         walletRepository.save(wallet);
 
-        Transaction tx = Transaction.builder()
+        Transaction tx = transactionRepository.save(Transaction.builder()
                 .walletId(wallet.getId())
                 .type(TransactionType.DEPOSIT)
                 .amount(request.amount())
                 .balanceAfter(newBalance)
                 .currency(wallet.getCurrency())
                 .description(request.description())
-                .build();
+                .idempotencyKey(request.idempotencyKey())
+                .build());
 
-        tx = transactionRepository.save(tx);
         log.info("DEPOSIT walletId={} amount={} newBalance={}", walletId, request.amount(), newBalance);
-        return toTransactionResponse(tx);
+        return transactionMapper.toResponse(tx);
     }
 
     @Transactional(isolation = Isolation.REPEATABLE_READ)
     public TransactionResponse withdraw(UUID walletId, WithdrawRequest request) {
+        if (request.idempotencyKey() != null) {
+            return transactionRepository.findByIdempotencyKey(request.idempotencyKey())
+                    .map(existing -> resolveIdempotent(existing, walletId))
+                    .orElseGet(() -> executeWithdraw(walletId, request));
+        }
+        return executeWithdraw(walletId, request);
+    }
+
+    private TransactionResponse executeWithdraw(UUID walletId, WithdrawRequest request) {
         Wallet wallet = findWalletWithLockOrThrow(walletId);
 
         if (wallet.getBalance().compareTo(request.amount()) < 0) {
@@ -157,18 +175,18 @@ public class WalletService {
         wallet.setBalance(newBalance);
         walletRepository.save(wallet);
 
-        Transaction tx = Transaction.builder()
+        Transaction tx = transactionRepository.save(Transaction.builder()
                 .walletId(wallet.getId())
                 .type(TransactionType.WITHDRAWAL)
                 .amount(request.amount().negate())
                 .balanceAfter(newBalance)
                 .currency(wallet.getCurrency())
                 .description(request.description())
-                .build();
+                .idempotencyKey(request.idempotencyKey())
+                .build());
 
-        tx = transactionRepository.save(tx);
         log.info("WITHDRAWAL walletId={} amount={} newBalance={}", walletId, request.amount(), newBalance);
-        return toTransactionResponse(tx);
+        return transactionMapper.toResponse(tx);
     }
 
     /**
@@ -176,28 +194,33 @@ public class WalletService {
      *
      * <p>Deadlock prevention: wallets are always locked in ascending UUID order
      * so that concurrent transfers between the same pair never deadlock.
+     * The idempotencyKey is stored on the DEBIT transaction (the one returned).
      */
     @Transactional(isolation = Isolation.REPEATABLE_READ)
     public TransactionResponse transfer(UUID sourceWalletId, TransferRequest request) {
-        UUID targetWalletId = request.targetWalletId();
-
-        if (sourceWalletId.equals(targetWalletId)) {
+        if (sourceWalletId.equals(request.targetWalletId())) {
             throw new InvalidOperationException("Source and target wallets must be different");
         }
 
-        // Acquire locks in deterministic order to prevent deadlocks
-        Wallet first;
-        Wallet second;
-        if (sourceWalletId.compareTo(targetWalletId) < 0) {
-            first = findWalletWithLockOrThrow(sourceWalletId);
-            second = findWalletWithLockOrThrow(targetWalletId);
-        } else {
-            second = findWalletWithLockOrThrow(sourceWalletId);
-            first = findWalletWithLockOrThrow(targetWalletId);
+        if (request.idempotencyKey() != null) {
+            return transactionRepository.findByIdempotencyKey(request.idempotencyKey())
+                    .map(existing -> resolveIdempotent(existing, sourceWalletId))
+                    .orElseGet(() -> executeTransfer(sourceWalletId, request));
         }
+        return executeTransfer(sourceWalletId, request);
+    }
 
-        Wallet source = first.getId().equals(sourceWalletId) ? first : second;
-        Wallet target = first.getId().equals(targetWalletId) ? first : second;
+    private TransactionResponse executeTransfer(UUID sourceWalletId, TransferRequest request) {
+        UUID targetWalletId = request.targetWalletId();
+
+        UUID lowerUuid  = sourceWalletId.compareTo(targetWalletId) < 0 ? sourceWalletId : targetWalletId;
+        UUID higherUuid = lowerUuid.equals(sourceWalletId) ? targetWalletId : sourceWalletId;
+
+        Wallet lowerWallet  = findWalletWithLockOrThrow(lowerUuid);
+        Wallet higherWallet = findWalletWithLockOrThrow(higherUuid);
+
+        Wallet source = lowerWallet.getId().equals(sourceWalletId) ? lowerWallet : higherWallet;
+        Wallet target = lowerWallet.getId().equals(targetWalletId) ? lowerWallet : higherWallet;
 
         if (!source.getCurrency().equals(target.getCurrency())) {
             throw new InvalidOperationException(
@@ -220,7 +243,7 @@ public class WalletService {
         target.setBalance(targetNewBalance);
         walletRepository.save(target);
 
-        Transaction debitTx = Transaction.builder()
+        Transaction debitTx = transactionRepository.save(Transaction.builder()
                 .walletId(source.getId())
                 .type(TransactionType.TRANSFER_DEBIT)
                 .amount(request.amount().negate())
@@ -229,9 +252,10 @@ public class WalletService {
                 .correlationId(correlationId)
                 .counterpartWalletId(target.getId())
                 .description(request.description())
-                .build();
+                .idempotencyKey(request.idempotencyKey())
+                .build());
 
-        Transaction creditTx = Transaction.builder()
+        transactionRepository.save(Transaction.builder()
                 .walletId(target.getId())
                 .type(TransactionType.TRANSFER_CREDIT)
                 .amount(request.amount())
@@ -240,15 +264,12 @@ public class WalletService {
                 .correlationId(correlationId)
                 .counterpartWalletId(source.getId())
                 .description(request.description())
-                .build();
-
-        transactionRepository.save(debitTx);
-        transactionRepository.save(creditTx);
+                .build());
 
         log.info("TRANSFER correlationId={} source={} target={} amount={}",
                 correlationId, sourceWalletId, targetWalletId, request.amount());
 
-        return toTransactionResponse(debitTx);
+        return transactionMapper.toResponse(debitTx);
     }
 
     // -----------------------------------------------------------------------
@@ -257,9 +278,9 @@ public class WalletService {
 
     @Transactional(readOnly = true)
     public Page<TransactionResponse> getTransactions(UUID walletId, Pageable pageable) {
-        findWalletOrThrow(walletId); // ensure wallet exists
+        findWalletOrThrow(walletId);
         return transactionRepository.findByWalletIdOrderByCreatedAtDesc(walletId, pageable)
-                .map(this::toTransactionResponse);
+                .map(transactionMapper::toResponse);
     }
 
     // -----------------------------------------------------------------------
@@ -276,15 +297,10 @@ public class WalletService {
                 .orElseThrow(() -> new WalletNotFoundException("Wallet not found: " + walletId));
     }
 
-    private WalletResponse toResponse(Wallet w) {
-        return new WalletResponse(w.getId(), w.getUserId(), w.getBalance(),
-                w.getCurrency(), w.getCreatedAt(), w.getUpdatedAt());
-    }
-
-    private TransactionResponse toTransactionResponse(Transaction t) {
-        return new TransactionResponse(t.getId(), t.getWalletId(), t.getType(),
-                t.getAmount(), t.getBalanceAfter(), t.getCurrency(),
-                t.getCorrelationId(), t.getCounterpartWalletId(),
-                t.getDescription(), t.getCreatedAt());
+    private TransactionResponse resolveIdempotent(Transaction existing, UUID expectedWalletId) {
+        if (!existing.getWalletId().equals(expectedWalletId)) {
+            throw new InvalidOperationException("Idempotency key already used for a different wallet");
+        }
+        return transactionMapper.toResponse(existing);
     }
 }

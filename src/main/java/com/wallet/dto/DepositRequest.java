@@ -6,6 +6,7 @@ import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 
 import java.math.BigDecimal;
+import java.util.UUID;
 
 public record DepositRequest(
 
@@ -15,5 +16,7 @@ public record DepositRequest(
     BigDecimal amount,
 
     @Size(max = 255)
-    String description
+    String description,
+
+    UUID idempotencyKey
 ) {}

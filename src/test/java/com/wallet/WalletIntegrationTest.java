@@ -92,7 +92,7 @@ class WalletIntegrationTest {
 
         mvc.perform(post("/api/v1/wallets/" + wallet.id() + "/deposit")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(new DepositRequest(new BigDecimal("250.00"), "test deposit"))))
+                        .content(objectMapper.writeValueAsString(new DepositRequest(new BigDecimal("250.00"), "test deposit", null))))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.type").value("DEPOSIT"))
                 .andExpect(jsonPath("$.balanceAfter").value(250.00));
@@ -105,7 +105,7 @@ class WalletIntegrationTest {
 
         mvc.perform(post("/api/v1/wallets/" + wallet.id() + "/deposit")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(new DepositRequest(BigDecimal.ZERO, null))))
+                        .content(objectMapper.writeValueAsString(new DepositRequest(BigDecimal.ZERO, null, null))))
                 .andExpect(status().isBadRequest());
     }
 
@@ -121,7 +121,7 @@ class WalletIntegrationTest {
 
         mvc.perform(post("/api/v1/wallets/" + wallet.id() + "/withdraw")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(new WithdrawRequest(new BigDecimal("40.00"), null))))
+                        .content(objectMapper.writeValueAsString(new WithdrawRequest(new BigDecimal("40.00"), null, null))))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.type").value("WITHDRAWAL"))
                 .andExpect(jsonPath("$.balanceAfter").value(60.00));
@@ -134,7 +134,7 @@ class WalletIntegrationTest {
 
         mvc.perform(post("/api/v1/wallets/" + wallet.id() + "/withdraw")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(new WithdrawRequest(new BigDecimal("1.00"), null))))
+                        .content(objectMapper.writeValueAsString(new WithdrawRequest(new BigDecimal("1.00"), null, null))))
                 .andExpect(status().isUnprocessableEntity());
     }
 
@@ -152,7 +152,7 @@ class WalletIntegrationTest {
         mvc.perform(post("/api/v1/wallets/" + source.id() + "/transfer")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(
-                                new TransferRequest(target.id(), new BigDecimal("70.00"), null))))
+                                new TransferRequest(target.id(), new BigDecimal("70.00"), null, null))))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.type").value("TRANSFER_DEBIT"))
                 .andExpect(jsonPath("$.balanceAfter").value(130.00));
@@ -170,7 +170,7 @@ class WalletIntegrationTest {
         mvc.perform(post("/api/v1/wallets/" + wallet.id() + "/transfer")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(
-                                new TransferRequest(wallet.id(), new BigDecimal("10.00"), null))))
+                                new TransferRequest(wallet.id(), new BigDecimal("10.00"), null, null))))
                 .andExpect(status().isBadRequest());
     }
 
@@ -230,7 +230,7 @@ class WalletIntegrationTest {
     private void depositTo(UUID walletId, BigDecimal amount) throws Exception {
         mvc.perform(post("/api/v1/wallets/" + walletId + "/deposit")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(new DepositRequest(amount, null))))
+                        .content(objectMapper.writeValueAsString(new DepositRequest(amount, null, null))))
                 .andExpect(status().isOk());
     }
 }

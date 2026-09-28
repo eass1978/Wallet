@@ -5,6 +5,8 @@ import com.wallet.exception.DuplicateWalletException;
 import com.wallet.exception.InsufficientFundsException;
 import com.wallet.exception.InvalidOperationException;
 import com.wallet.exception.WalletNotFoundException;
+import com.wallet.mapper.TransactionMapper;
+import com.wallet.mapper.WalletMapper;
 import com.wallet.model.Transaction;
 import com.wallet.model.TransactionType;
 import com.wallet.model.Wallet;
@@ -14,7 +16,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
+import org.mapstruct.factory.Mappers;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
@@ -36,7 +38,9 @@ class WalletServiceTest {
     @Mock
     private TransactionRepository transactionRepository;
 
-    @InjectMocks
+    private final WalletMapper walletMapper = Mappers.getMapper(WalletMapper.class);
+    private final TransactionMapper transactionMapper = Mappers.getMapper(TransactionMapper.class);
+
     private WalletService walletService;
 
     private UUID walletId;
@@ -45,6 +49,7 @@ class WalletServiceTest {
 
     @BeforeEach
     void setUp() {
+        walletService = new WalletService(walletRepository, transactionRepository, walletMapper, transactionMapper);
         walletId = UUID.randomUUID();
         userId = UUID.randomUUID();
         wallet = Wallet.builder()
@@ -97,7 +102,7 @@ class WalletServiceTest {
         Transaction savedTx = buildTransaction(TransactionType.DEPOSIT, new BigDecimal("50.00"), new BigDecimal("150.00"));
         when(transactionRepository.save(any())).thenReturn(savedTx);
 
-        TransactionResponse response = walletService.deposit(walletId, new DepositRequest(new BigDecimal("50.00"), null));
+        TransactionResponse response = walletService.deposit(walletId, new DepositRequest(new BigDecimal("50.00"), null, null));
 
         assertThat(response.type()).isEqualTo(TransactionType.DEPOSIT);
         assertThat(response.amount()).isEqualByComparingTo(new BigDecimal("50.00"));
@@ -105,11 +110,25 @@ class WalletServiceTest {
     }
 
     @Test
+    @DisplayName("deposit - returns existing transaction for duplicate idempotency key")
+    void deposit_idempotentDuplicate() {
+        UUID idempotencyKey = UUID.randomUUID();
+        Transaction existingTx = buildTransaction(TransactionType.DEPOSIT, new BigDecimal("50.00"), new BigDecimal("150.00"));
+        when(transactionRepository.findByIdempotencyKey(idempotencyKey)).thenReturn(Optional.of(existingTx));
+
+        TransactionResponse response = walletService.deposit(walletId,
+                new DepositRequest(new BigDecimal("50.00"), null, idempotencyKey));
+
+        assertThat(response.type()).isEqualTo(TransactionType.DEPOSIT);
+        verify(walletRepository, never()).findByIdWithLock(any());
+    }
+
+    @Test
     @DisplayName("deposit - throws WalletNotFoundException for unknown wallet")
     void deposit_walletNotFound() {
         when(walletRepository.findByIdWithLock(walletId)).thenReturn(Optional.empty());
 
-        assertThatThrownBy(() -> walletService.deposit(walletId, new DepositRequest(BigDecimal.TEN, null)))
+        assertThatThrownBy(() -> walletService.deposit(walletId, new DepositRequest(BigDecimal.TEN, null, null)))
                 .isInstanceOf(WalletNotFoundException.class);
     }
 
@@ -126,10 +145,24 @@ class WalletServiceTest {
         Transaction savedTx = buildTransaction(TransactionType.WITHDRAWAL, new BigDecimal("-50.00"), new BigDecimal("50.00"));
         when(transactionRepository.save(any())).thenReturn(savedTx);
 
-        TransactionResponse response = walletService.withdraw(walletId, new WithdrawRequest(new BigDecimal("50.00"), null));
+        TransactionResponse response = walletService.withdraw(walletId, new WithdrawRequest(new BigDecimal("50.00"), null, null));
 
         assertThat(response.type()).isEqualTo(TransactionType.WITHDRAWAL);
         assertThat(response.balanceAfter()).isEqualByComparingTo(new BigDecimal("50.00"));
+    }
+
+    @Test
+    @DisplayName("withdraw - returns existing transaction for duplicate idempotency key")
+    void withdraw_idempotentDuplicate() {
+        UUID idempotencyKey = UUID.randomUUID();
+        Transaction existingTx = buildTransaction(TransactionType.WITHDRAWAL, new BigDecimal("-50.00"), new BigDecimal("50.00"));
+        when(transactionRepository.findByIdempotencyKey(idempotencyKey)).thenReturn(Optional.of(existingTx));
+
+        TransactionResponse response = walletService.withdraw(walletId,
+                new WithdrawRequest(new BigDecimal("50.00"), null, idempotencyKey));
+
+        assertThat(response.type()).isEqualTo(TransactionType.WITHDRAWAL);
+        verify(walletRepository, never()).findByIdWithLock(any());
     }
 
     @Test
@@ -137,7 +170,7 @@ class WalletServiceTest {
     void withdraw_insufficientFunds() {
         when(walletRepository.findByIdWithLock(walletId)).thenReturn(Optional.of(wallet));
 
-        assertThatThrownBy(() -> walletService.withdraw(walletId, new WithdrawRequest(new BigDecimal("200.00"), null)))
+        assertThatThrownBy(() -> walletService.withdraw(walletId, new WithdrawRequest(new BigDecimal("200.00"), null, null)))
                 .isInstanceOf(InsufficientFundsException.class);
     }
 
@@ -159,19 +192,18 @@ class WalletServiceTest {
                 .updatedAt(Instant.now())
                 .build();
 
-        // Ensure deterministic lock ordering
-        UUID first = walletId.compareTo(targetId) < 0 ? walletId : targetId;
-        UUID second = walletId.compareTo(targetId) < 0 ? targetId : walletId;
+        UUID lowerUuid  = walletId.compareTo(targetId) < 0 ? walletId : targetId;
+        UUID higherUuid = lowerUuid.equals(walletId) ? targetId : walletId;
 
-        when(walletRepository.findByIdWithLock(first))
-                .thenReturn(Optional.of(first.equals(walletId) ? wallet : target));
-        when(walletRepository.findByIdWithLock(second))
-                .thenReturn(Optional.of(second.equals(walletId) ? wallet : target));
+        when(walletRepository.findByIdWithLock(lowerUuid))
+                .thenReturn(Optional.of(lowerUuid.equals(walletId) ? wallet : target));
+        when(walletRepository.findByIdWithLock(higherUuid))
+                .thenReturn(Optional.of(higherUuid.equals(walletId) ? wallet : target));
         when(walletRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
         when(transactionRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
         TransactionResponse response = walletService.transfer(walletId,
-                new TransferRequest(targetId, new BigDecimal("30.00"), null));
+                new TransferRequest(targetId, new BigDecimal("30.00"), null, null));
 
         assertThat(response.type()).isEqualTo(TransactionType.TRANSFER_DEBIT);
         assertThat(response.amount()).isEqualByComparingTo(new BigDecimal("-30.00"));
@@ -179,10 +211,24 @@ class WalletServiceTest {
     }
 
     @Test
+    @DisplayName("transfer - returns existing transaction for duplicate idempotency key")
+    void transfer_idempotentDuplicate() {
+        UUID idempotencyKey = UUID.randomUUID();
+        Transaction existingTx = buildTransaction(TransactionType.TRANSFER_DEBIT, new BigDecimal("-30.00"), new BigDecimal("70.00"));
+        when(transactionRepository.findByIdempotencyKey(idempotencyKey)).thenReturn(Optional.of(existingTx));
+
+        TransactionResponse response = walletService.transfer(walletId,
+                new TransferRequest(UUID.randomUUID(), new BigDecimal("30.00"), null, idempotencyKey));
+
+        assertThat(response.type()).isEqualTo(TransactionType.TRANSFER_DEBIT);
+        verify(walletRepository, never()).findByIdWithLock(any());
+    }
+
+    @Test
     @DisplayName("transfer - throws InvalidOperationException for self-transfer")
     void transfer_selfTransfer() {
         assertThatThrownBy(() -> walletService.transfer(walletId,
-                new TransferRequest(walletId, BigDecimal.TEN, null)))
+                new TransferRequest(walletId, BigDecimal.TEN, null, null)))
                 .isInstanceOf(InvalidOperationException.class);
     }
 
@@ -194,15 +240,16 @@ class WalletServiceTest {
                 .balance(BigDecimal.ZERO).currency("BRL").version(0L)
                 .createdAt(Instant.now()).updatedAt(Instant.now()).build();
 
-        UUID first = walletId.compareTo(targetId) < 0 ? walletId : targetId;
-        UUID second = walletId.compareTo(targetId) < 0 ? targetId : walletId;
-        when(walletRepository.findByIdWithLock(first))
-                .thenReturn(Optional.of(first.equals(walletId) ? wallet : target));
-        when(walletRepository.findByIdWithLock(second))
-                .thenReturn(Optional.of(second.equals(walletId) ? wallet : target));
+        UUID lowerUuid  = walletId.compareTo(targetId) < 0 ? walletId : targetId;
+        UUID higherUuid = lowerUuid.equals(walletId) ? targetId : walletId;
+
+        when(walletRepository.findByIdWithLock(lowerUuid))
+                .thenReturn(Optional.of(lowerUuid.equals(walletId) ? wallet : target));
+        when(walletRepository.findByIdWithLock(higherUuid))
+                .thenReturn(Optional.of(higherUuid.equals(walletId) ? wallet : target));
 
         assertThatThrownBy(() -> walletService.transfer(walletId,
-                new TransferRequest(targetId, new BigDecimal("999.00"), null)))
+                new TransferRequest(targetId, new BigDecimal("999.00"), null, null)))
                 .isInstanceOf(InsufficientFundsException.class);
     }
 

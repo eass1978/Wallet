@@ -72,6 +72,9 @@ public class Transaction {
     @Column(name = "description", updatable = false, length = 255)
     private String description;
 
+    @Column(name = "idempotency_key", unique = true, updatable = false)
+    private UUID idempotencyKey;
+
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
